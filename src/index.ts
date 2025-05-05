@@ -1,32 +1,59 @@
 
 
-import { sys } from 'typescript';
-import * as db from './db';
 import Parser from "rss-parser";
+const { program } = require('commander');
+
+import * as db from './db';
 import type { Feed } from './db/schema';
 
-console.log(process.argv.slice(2));
+// Settup options handling
+program
+  .name('Podcast RSS Logger')
+  .description('A simple CLI tool to parse and log podcast RSS feeds')
+  .option('-f, --feed <feedId>', 'Only process this Feed ID')
+  .option('-d, --debug', 'Enable debug mode')
+  .option('-v, --verbose', 'Enable verbose mode')
+  .option('-h, --help', 'Display help information')
 
-const feedId = parseInt(process.argv[2], 10);
-const parser: Parser = new Parser({});
+program.parse();
+const options = program.opts();
 
+
+if (options.help) {
+  program.help();
+}
+if (options.debug) {
+  console.log('Debug mode enabled');
+}
+if (options.verbose) {
+  console.log('Verbose mode enabled');
+}
+
+// Select feed(s) to process
 let feedInfo: Feed[] = [];
-
-if (!isNaN(feedId)) {
-  const feed = await db.getFeedById(feedId);
-  if (feed) {
-    feedInfo = [feed];
-  }
-  else {
-    console.error(`Feed with ID ${feedId} not found`);
+if (options.feed) {
+  console.log(`Processing feed with ID: ${options.feed}`);
+  const feedId = parseInt(options.feed);
+  if (!isNaN(feedId)) {
+    const feed = await db.getFeedById(feedId);
+    if (feed) {
+      feedInfo = [feed];
+    }
+    else {
+      console.error(`Feed with ID ${feedId} not found`);
+      process.exit(1);
+    }
+  } else {
+    console.error(`Invalid feed ID: ${options.feed}`);
+    program.help();
     process.exit(1);
   }
-} else {
+} else { // Default to all feeds
+  console.log('Processing all feeds');
   feedInfo = await db.getAllFeeds();
 }
 
-
-//sys.exit(0);
+const parser: Parser = new Parser({});
 
 
 feedInfo.forEach((feedRecord) => {

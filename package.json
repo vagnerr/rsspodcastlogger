@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@libsql/client": "^0.15.4",
+    "commander": "^13.1.0",
     "drizzle-orm": "^0.43.1",
     "rss-parser": "^3.13.0"
   }
