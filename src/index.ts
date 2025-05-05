@@ -4,7 +4,7 @@ import Parser from "rss-parser";
 const { program } = require('commander');
 
 import * as db from './db';
-import type { Feed } from './db/schema';
+import type { Feed, FeedInsert } from './db/schema';
 
 // Settup options handling
 program
@@ -12,6 +12,8 @@ program
   .description('A simple CLI tool to parse and log podcast RSS feeds')
   .option('-f, --feed <feedId>', 'Only process this Feed ID')
   .option('-l, --list', 'List all feeds')
+  .option('-n, --new <feedUrl> [<topic>]', 'Add new feed url')
+  .option('-t, --topic <feed topic>', 'Topic to record for feed (eg Securty, DevOps, etc)')
   .option('-d, --debug', 'Enable debug mode')
   .option('-v, --verbose', 'Enable verbose mode')
   .option('-h, --help', 'Display help information')
@@ -32,6 +34,11 @@ if (options.verbose) {
 
 if (options.list) {
   await listFeeds();
+}
+
+if (options.new) {
+
+  await addNewFeed(options.new, options.topic);
 }
 
 // Select feed(s) to process
@@ -138,3 +145,26 @@ async function listFeeds() {
   process.exit(0);
 }
 
+/**
+ * Add new RSS feed to database to be logged.
+ * 
+ * @param feedUrl Url of rss feed to be added
+ */
+async function addNewFeed(feedUrl : string, feedTopic: string) {
+  console.log(`Adding new feed for url ${feedUrl} (Topic: ${feedTopic})`);
+  const parser: Parser = new Parser({});
+  const feed = await parser.parseURL(feedUrl);
+
+  console.log(feed.title)
+  console.log(feed.description)
+
+  const FeedInsert = {
+    title: feed.title,
+    topic: feedTopic,
+    link: feedUrl,
+    earliest: new Date()
+  }
+  await db.saveFeed(FeedInsert);
+
+  process.exit(0);
+}

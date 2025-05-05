@@ -45,3 +45,8 @@ export async function saveEpisode(episode: schema.EpisodeInsert): Promise<boolea
     return false;
   }
 }
+
+export async function saveFeed(feed: schema.FeedInsert): Promise<boolean>{
+  const result = await db.insert(schema.feedTable).values(feed).returning().get();
+  return true; // TODO: Finish rest of function
+}
