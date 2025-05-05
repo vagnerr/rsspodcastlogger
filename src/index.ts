@@ -5,7 +5,6 @@ const { program } = require('commander');
 
 import * as db from './db';
 import type { Feed } from './db/schema';
-import { resolve } from "bun";
 
 // Settup options handling
 program
