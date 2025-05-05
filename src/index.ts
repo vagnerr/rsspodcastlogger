@@ -5,12 +5,14 @@ const { program } = require('commander');
 
 import * as db from './db';
 import type { Feed } from './db/schema';
+import { resolve } from "bun";
 
 // Settup options handling
 program
   .name('Podcast RSS Logger')
   .description('A simple CLI tool to parse and log podcast RSS feeds')
   .option('-f, --feed <feedId>', 'Only process this Feed ID')
+  .option('-l, --list', 'List all feeds')
   .option('-d, --debug', 'Enable debug mode')
   .option('-v, --verbose', 'Enable verbose mode')
   .option('-h, --help', 'Display help information')
@@ -27,6 +29,10 @@ if (options.debug) {
 }
 if (options.verbose) {
   console.log('Verbose mode enabled');
+}
+
+if (options.list) {
+  await listFeeds();
 }
 
 // Select feed(s) to process
@@ -115,3 +121,21 @@ feedInfo.forEach((feedRecord) => {
   )();
 
 });
+
+
+async function listFeeds() {
+  console.log('Listing all feeds');
+  const feeds = await db.getAllFeeds();
+
+  feeds.forEach((feed) => {
+    if (options.verbose) {
+      console.log(`${feed.id}: ${feed.title} - ${feed.link} - ${feed.earliest} - ${feed.lastCheck}`);
+    }
+    else {
+      console.log(`${feed.id}: ${feed.title} - ${feed.link} - Last Check: ${feed.lastCheck}`);
+    }
+  });
+
+  process.exit(0);
+}
+
