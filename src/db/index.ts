@@ -26,6 +26,7 @@ export async function getAllFeeds(): Promise<schema.Feed[]> {
 }
 
 
+
 // Save episode to the database but only if it doesn't already exist
 // (check by guid)
 export async function saveEpisode(episode: schema.EpisodeInsert): Promise<boolean> {
@@ -70,6 +71,24 @@ export async function saveFeed(feed: schema.FeedInsert): Promise<boolean>{
     return true;
   } else {
     console.error("Feed insert failed");
+    return false;
+  }
+}
+
+
+/**
+ * Update existing feed record (eg to set last update)
+ * @param feed 
+ */
+export async function updateFeedRecord(feed: schema.FeedInsert): Promise<boolean>{
+  const result = await db.update(schema.feedTable).set(feed)
+    .where(eq(schema.feedTable.id, feed.id))
+    .returning().get();
+  if(result){
+    //console.log(`New Feed added ID: ${result.id}`);
+    return true;
+  } else {
+    console.error("Feed update failed");
     return false;
   }
 }

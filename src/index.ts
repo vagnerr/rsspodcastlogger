@@ -96,7 +96,7 @@ feedInfo.forEach((feedRecord) => {
     }
 
     console.log(feedRecord.title);
-    const COUNT = 5;
+    const COUNT = 5; //TODO: Move to proper default location.
     feed.items.slice(0,COUNT).forEach(item => {
       const poddate = new Date(item.isoDate);
       console.log(`  ${poddate} - ${feedRecord.earliest}`);
@@ -125,6 +125,10 @@ feedInfo.forEach((feedRecord) => {
         console.log("  skipping earlier item");
       }
     });
+
+    // Update last check
+    feedRecord.lastCheck = new Date();
+    db.updateFeedRecord(feedRecord);
   }
   )();
 
