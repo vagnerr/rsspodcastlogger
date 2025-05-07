@@ -66,6 +66,7 @@ export async function saveFeed(feed: schema.FeedInsert): Promise<boolean>{
   }
   const result = await db.insert(schema.feedTable).values(feed).returning().get();
   if(result){
+    console.log(`New Feed added ID: ${result.id}`);
     return true;
   } else {
     console.error("Feed insert failed");

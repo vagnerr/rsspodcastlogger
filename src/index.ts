@@ -6,6 +6,8 @@ const { program } = require('commander');
 import * as db from './db';
 import type { Feed, FeedInsert } from './db/schema';
 
+
+const LOOKBACK_DAYS = 14;
 // Settup options handling
 program
   .name('Podcast RSS Logger')
@@ -158,11 +160,13 @@ async function addNewFeed(feedUrl : string, feedTopic: string) {
   console.log(feed.title)
   console.log(feed.description)
 
+  const now = new Date();
+
   const FeedInsert = {
     title: feed.title,
     topic: feedTopic,
     link: feedUrl,
-    earliest: new Date()
+    earliest: new Date(now.getTime() - 1000 * 60 * 60 * 24 * LOOKBACK_DAYS)
   }
   await db.saveFeed(FeedInsert);
 
