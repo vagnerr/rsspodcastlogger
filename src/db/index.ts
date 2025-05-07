@@ -15,6 +15,10 @@ export async function getFeedById(id: number): Promise<schema.Feed | undefined> 
   const feed = await db.select().from(schema.feedTable).where(eq(schema.feedTable.id, id)).get();
   return feed;
 }
+export async function getFeedByUrl(url: string): Promise<schema.Feed | undefined> {
+  const feed = await db.select().from(schema.feedTable).where(eq(schema.feedTable.link, url)).get();
+  return feed;
+}
 
 export async function getAllFeeds(): Promise<schema.Feed[]> {
   const feeds = await db.select().from(schema.feedTable).all();
@@ -46,7 +50,25 @@ export async function saveEpisode(episode: schema.EpisodeInsert): Promise<boolea
   }
 }
 
+/**
+ * Save new feed to database but only if the feed does not already exist 
+ * (keyed on the given URL)
+ * 
+ * @param feed 
+ * @returns true if new feed saved, false it was a duplicate or insert failed
+ */
 export async function saveFeed(feed: schema.FeedInsert): Promise<boolean>{
+  const oldfeed = await getFeedByUrl(feed.link);
+  if (oldfeed){
+    // already have feed
+    console.warn(`Feed already exists ID: ${oldfeed.id}`);
+    return false
+  }
   const result = await db.insert(schema.feedTable).values(feed).returning().get();
-  return true; // TODO: Finish rest of function
+  if(result){
+    return true;
+  } else {
+    console.error("Feed insert failed");
+    return false;
+  }
 }
