@@ -2,7 +2,7 @@ import { createClient } from '@libsql/client';
 import * as schema from './schema';
 import { drizzle } from 'drizzle-orm/libsql';
 import { eq } from 'drizzle-orm';
-
+import { logInfo, logError, logDebug, logVerbose, logWarning } from "../log";
 
 const client = createClient({
   url: process.env.DB_URL || 'file:./local.db',
@@ -37,40 +37,40 @@ export async function saveEpisode(episode: schema.EpisodeInsert): Promise<boolea
     .where(eq(schema.episodeTable.guid, episode.guid))
     .get();
   if (existingEpisode) {
-    console.log(`Episode with guid ${episode.guid} already exists. Skipping insert.`);
+    logDebug(`    Episode with guid ${episode.guid} already exists. Skipping insert.`);
     return false;
   }
   // Insert the episode if it doesn't exist
   const result = await db.insert(schema.episodeTable).values(episode).returning().get();
   if (result) {
-    console.log(`Inserted episode: ${result.title}`);
+    logVerbose(`    Inserted episode: ${result.title}`);
     return true;
   } else {
-    console.error('Failed to insert episode');
+    logError('    Failed to insert episode');
     return false;
   }
 }
 
 /**
- * Save new feed to database but only if the feed does not already exist 
+ * Save new feed to database but only if the feed does not already exist
  * (keyed on the given URL)
- * 
- * @param feed 
+ *
+ * @param feed
  * @returns true if new feed saved, false it was a duplicate or insert failed
  */
 export async function saveFeed(feed: schema.FeedInsert): Promise<boolean>{
   const oldfeed = await getFeedByUrl(feed.link);
   if (oldfeed){
     // already have feed
-    console.warn(`Feed already exists ID: ${oldfeed.id}`);
+    logWarning(`Feed already exists ID: ${oldfeed.id}`);
     return false
   }
   const result = await db.insert(schema.feedTable).values(feed).returning().get();
   if(result){
-    console.log(`New Feed added ID: ${result.id}`);
+    logInfo(`New Feed added ID: ${result.id}`);
     return true;
   } else {
-    console.error("Feed insert failed");
+    logError("Feed insert failed");
     return false;
   }
 }
@@ -78,17 +78,17 @@ export async function saveFeed(feed: schema.FeedInsert): Promise<boolean>{
 
 /**
  * Update existing feed record (eg to set last update)
- * @param feed 
+ * @param feed
  */
 export async function updateFeedRecord(feed: schema.FeedInsert): Promise<boolean>{
   const result = await db.update(schema.feedTable).set(feed)
     .where(eq(schema.feedTable.id, feed.id))
     .returning().get();
   if(result){
-    //console.log(`New Feed added ID: ${result.id}`);
+    logDebug(`Feed Updated: ${result.id}`);
     return true;
   } else {
-    console.error("Feed update failed");
+    logError("Feed update failed");
     return false;
   }
 }

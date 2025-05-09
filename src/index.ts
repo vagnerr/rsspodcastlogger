@@ -1,18 +1,18 @@
-
-
 import Parser from "rss-parser";
 const { program } = require('commander');
 
 import * as db from './db';
 import type { Feed, FeedInsert } from './db/schema';
+import { logInfo, logError, logDebug, logVerbose } from "./log";
 
 
 const LOOKBACK_DAYS = 14;
 // Settup options handling
 program
   .name('Podcast RSS Logger')
-  .description('A simple CLI tool to parse and log podcast RSS feeds')
+  .description('A simple CLI tool to parse and log podcast RSS feeds (no arguments = run full feed update)')
   .option('-f, --feed <feedId>', 'Only process this Feed ID')
+  .option('-c, --count <count>', 'Number of items to process (default all)', '0')
   .option('-l, --list', 'List all feeds')
   .option('-n, --new <feedUrl> [<topic>]', 'Add new feed url')
   .option('-t, --topic <feed topic>', 'Topic to record for feed (eg Securty, DevOps, etc)')
@@ -21,17 +21,17 @@ program
   .option('-h, --help', 'Display help information')
 
 program.parse();
-const options = program.opts();
+export const options = program.opts();
 
 
 if (options.help) {
   program.help();
 }
 if (options.debug) {
-  console.log('Debug mode enabled');
+  logInfo('Debug mode enabled');
 }
 if (options.verbose) {
-  console.log('Verbose mode enabled');
+  logInfo('Verbose mode enabled');
 }
 
 if (options.list) {
@@ -46,7 +46,7 @@ if (options.new) {
 // Select feed(s) to process
 let feedInfo: Feed[] = [];
 if (options.feed) {
-  console.log(`Processing feed with ID: ${options.feed}`);
+  logInfo(`Processing feed with ID: ${options.feed}`);
   const feedId = parseInt(options.feed);
   if (!isNaN(feedId)) {
     const feed = await db.getFeedById(feedId);
@@ -54,86 +54,101 @@ if (options.feed) {
       feedInfo = [feed];
     }
     else {
-      console.error(`Feed with ID ${feedId} not found`);
+      logError(`Feed with ID ${feedId} not found`);
       process.exit(1);
     }
   } else {
-    console.error(`Invalid feed ID: ${options.feed}`);
+    logError(`Invalid feed ID: ${options.feed}`);
     program.help();
     process.exit(1);
   }
 } else { // Default to all feeds
-  console.log('Processing all feeds');
+  logInfo('Processing all feeds');
   feedInfo = await db.getAllFeeds();
 }
 
-const parser: Parser = new Parser({});
 
 
-feedInfo.forEach((feedRecord) => {
 
-  //console.log(feedRecord);
-  (async () => {
-    //const feed = await parser.parseURL('https://www.arresteddevops.com/episode/index.xml'); // Arrested DevOps
-    //const feed = await parser.parseURL('https://feeds.simplecast.com/vUHP7wpf');   // Redhat command line heroes
-    //const feed = await parser.parseURL('https://podcast.darknetdiaries.com');  // Darknet Diaries
-    //const feed = await parser.parseURL('https://plusone.apache.org/feed/podcast');  // FeatherCast
-    //const feed = await parser.parseURL('https://feeds.twit.tv/twig.xml');  // This Week in Google /IM
-    //const feed = await parser.parseURL('https://feeds.twit.tv/twit.xml');  // This Week in Tech
-    //const feed = await parser.parseURL('https://feeds.twit.tv/sn.xml');  // Security Now
-    //const feed = await parser.parseURL('https://anchor.fm/s/f408358c/podcast/rss'); // ncsc cyber Series podcast
-    //const feed = await parser.parseURL('http://risky.biz/feeds/risky-business/'); // Risky Business     duration is in seconds
-    //const feed = await parser.parseURL('https://feeds.soundcloud.com/users/soundcloud:users:232096760/sounds.rss'); //IBM Securit: Security Intelligence Podcast
-    //const feed = await parser.parseURL('https://feeds.simplecast.com/XA_851k3'); // The Stack Overflow Podcast    (older eps loose details)
+await processFeeds();
 
-    let feed;
 
-    if (typeof feedRecord.link === 'string') {
-      feed = await parser.parseURL(feedRecord.link);
-    } else {
-      console.error('Invalid feed link:', feedRecord.link);
-      return;
-    }
 
-    console.log(feedRecord.title);
-    const COUNT = 5; //TODO: Move to proper default location.
-    feed.items.slice(0,COUNT).forEach(item => {
-      const poddate = new Date(item.isoDate);
-      console.log(`  ${poddate} - ${feedRecord.earliest}`);
-      if(poddate > feedRecord.earliest){
-        // trim whitespace from title
-        item.title = item.title.trim();
-        console.log(`  ${item.title} -> ${item.link}`);
-        console.log(`  guid: ${item.guid} : duration: ${item.itunes.duration}`);
-        console.log(`  pubDate: ${item.pubDate} - isoData: ${item.isoDate}`);
+/**
+ * Process feeds and save episodes to the database
+ */
+async function processFeeds() {
+  const parser: Parser = new Parser({});
 
-        //console.log(item);
-        const EpisodeInsert = {
-          feedId: feedRecord.id,
-          title: item.title,
-          link: item.link,
-          guid: item.guid,
-          pubDate: poddate,
-          duration: item.itunes.duration,
-          recorded: false
-        };
+  feedInfo.forEach((feedRecord) => {
 
-        //console.log(EpisodeInsert);
-        db.saveEpisode(EpisodeInsert);
+    logDebug(feedRecord.toString());
+    (async () => {
+      let feed;
 
+      if (typeof feedRecord.link === 'string') {
+        feed = await parser.parseURL(feedRecord.link);
       } else {
-        console.log("  skipping earlier item");
+        logError('Invalid feed link:', feedRecord.link);
+        return;
       }
-    });
 
-    // Update last check
-    feedRecord.lastCheck = new Date();
-    db.updateFeedRecord(feedRecord);
-  }
-  )();
+      logInfo(`\n${feedRecord.id} - ${feedRecord.title}`);
 
-});
+      let max_count = 0;
+      if (options.count) {
+        const count = parseInt(options.count);
+        if (!isNaN(count) && count > 0) {
+          max_count = count;
+        } else {
+          max_count = feed.items.length; // default to all items
+        }
+      }
+      logInfo(`  Processing max ${max_count} items of ${feed.items.length} total`);
+      let skipCount = 0;
 
+      //feed.items.slice(0, max_count).forEach(async item => {
+      const promises = feed.items.slice(0, max_count).map(async item => {
+        const poddate = new Date(item.isoDate);
+        logDebug(`  ${poddate} > ${feedRecord.earliest}?`);
+        if (poddate > feedRecord.earliest) {
+          // trim whitespace from title
+          item.title = item.title.trim();
+          logVerbose(`    ${item.title} -> ${item.link}`);
+          logDebug(`      guid: ${item.guid} : duration: ${item.itunes.duration}`);
+          logDebug(`      pubDate: ${item.pubDate} - isoData: ${item.isoDate}`);
+
+          const EpisodeInsert = {
+            feedId: feedRecord.id,
+            title: item.title,
+            link: item.link,
+            guid: item.guid,
+            pubDate: poddate,
+            duration: item.itunes.duration,
+            recorded: false
+          };
+
+          //console.log(EpisodeInsert);
+          const success = await db.saveEpisode(EpisodeInsert);
+          if (!success) {
+            skipCount++;
+          };
+
+        } else {
+          logDebug("  skipping earlier item");
+          skipCount++;
+        }
+      });
+      await Promise.all(promises); // wait for all the feeds data to complete
+      logInfo(`  ${max_count - skipCount} items processed, ${skipCount} skipped`);
+      // Update last check
+      feedRecord.lastCheck = new Date();
+      await db.updateFeedRecord(feedRecord);
+    }
+    )();
+
+  });
+}
 
 async function listFeeds() {
   console.log('Listing all feeds');
@@ -153,7 +168,7 @@ async function listFeeds() {
 
 /**
  * Add new RSS feed to database to be logged.
- * 
+ *
  * @param feedUrl Url of rss feed to be added
  */
 async function addNewFeed(feedUrl : string, feedTopic: string) {
@@ -176,3 +191,5 @@ async function addNewFeed(feedUrl : string, feedTopic: string) {
 
   process.exit(0);
 }
+
+
