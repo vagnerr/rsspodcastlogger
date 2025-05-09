@@ -36,7 +36,7 @@ export const feedTable = sqliteTable("feed", {
 
 export const episodeTable = sqliteTable("episode", {
   id: integer("id").primaryKey({autoIncrement: true}),
-  feedId: integer("feedId").notNull(),
+  feedId: integer("feedId").notNull().references(() => feedTable.id),
   title: text("title").notNull(),
   link: text("link").notNull(),
   guid: text("guid").notNull(),
