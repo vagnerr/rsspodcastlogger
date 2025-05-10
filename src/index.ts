@@ -124,7 +124,7 @@ async function processFeeds() {
             link: item.link,
             guid: item.guid,
             pubDate: poddate,
-            duration: item.itunes.duration,
+            duration: getDurationAsSeconds(item),
             recorded: false
           };
 
@@ -193,3 +193,38 @@ async function addNewFeed(feedUrl : string, feedTopic: string) {
 }
 
 
+/**
+ * Durations can be found in item.itunes.duration or item.enclosure.length
+ * itunes:
+ *    Some feeds have a duration in H:MM:SS format, others are just seconds
+ *    (e.g. 1:23:45 or 12345) return a consistent duration in seconds
+ *    not all feeds have this field
+ * enclosure:
+ *    enclosure.duration seems to be in milliseconds
+ *
+ * @param duration
+ */
+function getDurationAsSeconds(item: any) {
+  if (item.itunes.duration) {
+    if (typeof item.itunes.duration === 'string') {
+      const parts = item.itunes.duration.split(':');
+      if (parts.length === 3) {
+        // H:MM:SS format
+        return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+      } else if (parts.length === 2) {
+        // MM:SS format (hopefully :-) may be HH:MM) only time will tell
+        return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+      } else {
+        // Just seconds
+        return parseInt(item.itunes.duration);
+      }
+    }
+  } else if (typeof item.enclosure.length === 'string') {
+    // Just seconds
+    return Math.floor(parseInt(item.enclosure.length) / 1000);
+  } else {
+    logError("cannot find duration");
+    logInfo(item);
+    return 0;
+  }
+}
