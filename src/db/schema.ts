@@ -12,6 +12,8 @@ import { relations } from "drizzle-orm";
 //   link: string
 //   earliest: date
 //   lastCheck: date
+//  dataOverride: string  Json string of fields changes from rss data to store in db
+//   (e.g. {link: "enclosure.url"} = read link from there instead of feed.link)
 
 export const feedTable = sqliteTable("feed", {
   id: integer("id").primaryKey({autoIncrement: true}),
@@ -19,7 +21,8 @@ export const feedTable = sqliteTable("feed", {
   topic: text("topic"),
   link: text("link").notNull(),
   earliest: timestamp("earliest").notNull(),
-  lastCheck: timestamp("lastCheck")
+  lastCheck: timestamp("lastCheck"),
+  dataOverride: text("dataOverride")
 });
 
 

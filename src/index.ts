@@ -118,15 +118,7 @@ async function processFeeds() {
           logDebug(`      guid: ${item.guid} : duration: ${item.itunes.duration}`);
           logDebug(`      pubDate: ${item.pubDate} - isoData: ${item.isoDate}`);
 
-          const EpisodeInsert = {
-            feedId: feedRecord.id,
-            title: item.title,
-            link: item.link,
-            guid: item.guid,
-            pubDate: poddate,
-            duration: getDurationAsSeconds(item),
-            recorded: false
-          };
+          const EpisodeInsert = buildEpisodeInsert(feedRecord, item);
 
           //console.log(EpisodeInsert);
           const success = await db.saveEpisode(EpisodeInsert);
@@ -227,4 +219,53 @@ function getDurationAsSeconds(item: any) {
     logInfo(item);
     return 0;
   }
+}
+
+
+
+/**
+ * Build the episode to insert based on the feed record and the item
+ * using the feeditems override data if it exists
+ * @param feedRecord
+ * @param item
+ */
+function buildEpisodeInsert(feedRecord: Feed, item: any) {
+
+  // create base record
+  let episodeToInsert = {
+    feedId: feedRecord.id,
+    title: item.title,
+    link: item.link,
+    guid: item.guid,
+    pubDate: new Date(item.isoDate), // recalulating it rather than pass in
+    duration: getDurationAsSeconds(item),
+    recorded: false
+  };
+
+  // apply any overrides from the feed record
+  if (feedRecord.dataOverride) {
+    const overrides = JSON.parse(feedRecord.dataOverride);
+    for (const key in overrides) {
+      const value = overrides[key];
+      if (key in episodeToInsert) {
+        episodeToInsert[key] = getNestedValue(item, value);
+      } else {
+        logError(`Invalid override key: ${key}`);
+      }
+    }
+  }
+
+  logDebug(episodeToInsert);
+  return episodeToInsert;
+}
+
+/**
+ * Given JSON object and a path (e.g. "enclosure.url") walk the object
+ * and return the value at that path
+ * @param obj
+ * @param path
+ * @returns
+ */
+function getNestedValue(obj: any, path: string): any {
+  return path.split('.').reduce((acc, part) => acc && acc[part], obj);
 }
