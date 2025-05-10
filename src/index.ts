@@ -7,6 +7,7 @@ import { logInfo, logError, logDebug, logVerbose } from "./log";
 
 
 const LOOKBACK_DAYS = 14;
+
 // Settup options handling
 program
   .name('Podcast RSS Logger')
@@ -16,6 +17,7 @@ program
   .option('-l, --list', 'List all feeds')
   .option('-n, --new <feedUrl> [<topic>]', 'Add new feed url')
   .option('-t, --topic <feed topic>', 'Topic to record for feed (eg Securty, DevOps, etc)')
+  .option('-b, --back <days>', 'go back <days> for earliest date to process (feed run or new feed add)', LOOKBACK_DAYS.toString())
   .option('-d, --debug', 'Enable debug mode')
   .option('-v, --verbose', 'Enable verbose mode')
   .option('-h, --help', 'Display help information')
@@ -42,6 +44,20 @@ if (options.new) {
 
   await addNewFeed(options.new, options.topic);
 }
+
+let lookbackDays = parseInt(options.back);
+let earliestProcessDate = null;
+
+if (isNaN(lookbackDays) || lookbackDays < 1) {
+  lookbackDays = LOOKBACK_DAYS;
+} else {
+  // Prepare the earliest date to process for if the feed is running now
+  // only do it if we had an explicit argument here as the dafault behaviour
+  // is to limit based on the earliest date in the db record
+  const now = new Date();
+  earliestProcessDate = new Date(now.getTime() - 1000 * 60 * 60 * 24 * lookbackDays)
+}
+
 
 // Select feed(s) to process
 let feedInfo: Feed[] = [];
@@ -111,7 +127,8 @@ async function processFeeds() {
       const promises = feed.items.slice(0, max_count).map(async item => {
         const poddate = new Date(item.isoDate);
         logDebug(`  ${poddate} > ${feedRecord.earliest}?`);
-        if (poddate > feedRecord.earliest) {
+        if (poddate > feedRecord.earliest ||
+          (earliestProcessDate && poddate > earliestProcessDate)) {
           // trim whitespace from title
           item.title = item.title.trim();
           logVerbose(`    ${item.title} -> ${item.link}`);
@@ -177,7 +194,7 @@ async function addNewFeed(feedUrl : string, feedTopic: string) {
     title: feed.title,
     topic: feedTopic,
     link: feedUrl,
-    earliest: new Date(now.getTime() - 1000 * 60 * 60 * 24 * LOOKBACK_DAYS)
+    earliest: new Date(now.getTime() - 1000 * 60 * 60 * 24 * lookbackDays)
   }
   await db.saveFeed(FeedInsert);
 
