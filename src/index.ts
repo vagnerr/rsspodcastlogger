@@ -326,7 +326,7 @@ async function generateReport() {
       // recorded: episode.recorded,
       // feedId: episode.feedId,
       // feedTitle: episode.feedTitle,
-      subject: episode.feedTopic
+      subject: episode.feedTopic || '',
     })
 
 
