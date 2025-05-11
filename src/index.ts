@@ -18,6 +18,10 @@ program
   .option('-n, --new <feedUrl> [<topic>]', 'Add new feed url')
   .option('-t, --topic <feed topic>', 'Topic to record for feed (eg Securty, DevOps, etc)')
   .option('-b, --back <days>', 'go back <days> for earliest date to process (feed run or new feed add)', LOOKBACK_DAYS.toString())
+  .option('-r, --report <file>', 'Report to save to file')
+  .option('--from <date>', 'Earliest date to report (YYYYMMDD)')
+  .option('--to <date>', 'Latest date to report (YYYYMMDD)')
+  .option('--full', 'Full report (default is only unrecorded episodes)')
   .option('-d, --debug', 'Enable debug mode')
   .option('-v, --verbose', 'Enable verbose mode')
   .option('-h, --help', 'Display help information')
@@ -84,8 +88,13 @@ if (options.feed) {
 }
 
 
+if (options.report) {
+  await generateReport();
+  process.exit(0);
+}
 
 
+// Default action is to process the feed data
 await processFeeds();
 
 
@@ -285,4 +294,58 @@ function buildEpisodeInsert(feedRecord: Feed, item: any) {
  */
 function getNestedValue(obj: any, path: string): any {
   return path.split('.').reduce((acc, part) => acc && acc[part], obj);
+}
+async function generateReport() {
+  const eps = await db.searchEpisodes(
+    {
+      feedId: options.feed?options.feed:undefined,
+      dateFrom: options.from?new Date(options.from):undefined,
+      dateTo: options.to?new Date(options.to):undefined,
+      recorded: options.full?undefined:false
+    }
+  );
+
+  for (let index = 0; index < eps.length; index++) {
+    const episode = eps[index];
+    const { hours, minutes } = formatSecondsToHoursMinutes(episode.duration);
+
+    // WIP need to have this saving to file and maybe a propper formating
+    // tool?
+    console.log({
+      //id: episode.id,
+      //feedId: episode.feedId,
+      title: episode.title,   // need to strip bad chars from this (eg ' or " )?
+                              // do we want to join this with the feed title?
+      //link: episode.link,
+      //guid: episode.guid,
+      //pubDate: episode.pubDate,
+      date: `${episode.pubDate.getUTCFullYear()}/${episode.pubDate.getUTCMonth()+1}/${episode.pubDate.getUTCDate()}`,
+      //duration: episode.duration,
+      hours: hours,
+      minutes: minutes,
+      // recorded: episode.recorded,
+      // feedId: episode.feedId,
+      // feedTitle: episode.feedTitle,
+      subject: episode.feedTopic
+    })
+
+
+  }
+
+}
+
+
+/**
+ * Format seconds to hours and minutes
+ * @param totalSeconds Total seconds to format
+ * @returns Object with hours and minutes (rounded up to nearest minute)
+ */
+function formatSecondsToHoursMinutes(totalSeconds: number): { hours: number; minutes: number } {
+  const hours = Math.floor(totalSeconds / 3600);
+  const remainingSeconds = totalSeconds % 3600;
+
+  // Round minutes up if there's any leftover seconds
+  const minutes = Math.ceil(remainingSeconds / 60);
+
+  return { hours, minutes };
 }
