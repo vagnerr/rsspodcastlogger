@@ -161,3 +161,20 @@ export async function updateFeedRecord(feed: schema.FeedInsert): Promise<boolean
     return false;
   }
 }
+
+/**
+ * Update existing episode record (eg to set recorded status)
+ * @param episode
+ */
+export async function updateEpisodeRecord(episode: schema.EpisodeInsert): Promise<boolean> {
+  const result = await db.update(schema.episodeTable).set(episode)
+    .where(eq(schema.episodeTable.id, episode.id))
+    .returning().get();
+  if(result){
+    logDebug(`Episode Updated: ${result.id}`);
+    return true;
+  } else {
+    logError("Episode update failed");
+    return false;
+  }
+}

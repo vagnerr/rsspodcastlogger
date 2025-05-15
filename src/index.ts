@@ -305,13 +305,27 @@ async function generateReport() {
     }
   );
 
+  const fileName = options.report;
+  const fs = require('fs');
+  const path = require('path');
+  const filePath = path.join(process.cwd(), fileName);
+
+  // Check if the file already exists
+  if (fs.existsSync(filePath)) {
+    // For now reject the file if it exists
+    logError(`File ${filePath} already exists. Please delete it or choose a different name.`);
+    process.exit(1);
+  }
+
+
+  let saveData = [];
   for (let index = 0; index < eps.length; index++) {
     const episode = eps[index];
     const { hours, minutes } = formatSecondsToHoursMinutes(episode.duration);
 
-    // WIP need to have this saving to file and maybe a propper formating
-    // tool?
-    console.log({
+
+    // TODO: have the data extracted by a configureable interchangable format
+    saveData.push({
       //id: episode.id,
       //feedId: episode.feedId,
       title: episode.title,   // need to strip bad chars from this (eg ' or " )?
@@ -327,10 +341,31 @@ async function generateReport() {
       // feedId: episode.feedId,
       // feedTitle: episode.feedTitle,
       subject: episode.feedTopic || '',
-    })
+    });
 
+    // TODO: should really hold these till after the file is written
+    // Update the episode record to mark it as recorded
+    await db.updateEpisodeRecord({
+                                  ...episode,
+                                  recorded: true
+                                });
 
   }
+
+  if (saveData.length === 0) {
+    logInfo('No unrecorded episodes found');
+    process.exit(0);
+  }
+  // Write the data to the file
+  const fileData = JSON.stringify(saveData, null, 2);
+  fs.writeFileSync(filePath, fileData, 'utf8');
+  logInfo(`Report saved to ${filePath}`);
+  logInfo(`Total episodes: ${saveData.length}`);
+
+  const { hours, minutes } = formatSecondsToHoursMinutes(
+    eps.reduce((acc, episode) => acc + episode.duration, 0)
+  );
+  logInfo(`Total duration: ${hours} hours, ${minutes} minutes`);
 
 }
 
