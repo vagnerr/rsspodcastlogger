@@ -104,17 +104,19 @@ await processFeeds();
  */
 async function processFeeds() {
   const parser: Parser = new Parser({});
+  let newEpisesodesCount = 0;
 
+  const feedPromises: Promise<void>[] = []
   feedInfo.forEach((feedRecord) => {
 
     logDebug(feedRecord.toString());
-    (async () => {
+    feedPromises.push(( async () => {
       let feed;
 
       if (typeof feedRecord.link === 'string') {
         feed = await parser.parseURL(feedRecord.link);
       } else {
-        logError('Invalid feed link:', feedRecord.link);
+        logError(`Invalid feed link: ${feedRecord.link}`);
         return;
       }
 
@@ -148,7 +150,9 @@ async function processFeeds() {
 
           //console.log(EpisodeInsert);
           const success = await db.saveEpisode(EpisodeInsert);
-          if (!success) {
+          if (success) {
+            newEpisesodesCount++;
+          } else {
             skipCount++;
           };
 
@@ -163,9 +167,14 @@ async function processFeeds() {
       feedRecord.lastCheck = new Date();
       await db.updateFeedRecord(feedRecord);
     }
-    )();
+    )());
 
   });
+  logInfo(`\nWaiting for all feeds to complete...`);
+  await Promise.all(feedPromises); // wait for all the feeds data to complete
+  logInfo(`\n${newEpisesodesCount} new episodes added to the database`);
+  logInfo(`\nDone!`);
+  process.exit(0);
 }
 
 async function listFeeds() {
