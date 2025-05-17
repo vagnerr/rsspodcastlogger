@@ -1,4 +1,4 @@
-import { options } from ".";
+import { options } from "..";
 
 export function logDebug(message: string) {
   if (options.debug) {

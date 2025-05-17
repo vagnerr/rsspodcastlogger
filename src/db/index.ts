@@ -2,7 +2,7 @@ import { createClient } from '@libsql/client';
 import * as schema from './schema';
 import { drizzle } from 'drizzle-orm/libsql';
 import { eq, gte, lte, and} from 'drizzle-orm';
-import { logInfo, logError, logDebug, logVerbose, logWarning } from "../log";
+import { logInfo, logError, logDebug, logVerbose, logWarning } from "../utils/log";
 
 const client = createClient({
   url: process.env.DB_URL || 'file:./local.db',
