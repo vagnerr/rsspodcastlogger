@@ -33,7 +33,7 @@ export async function processFeeds( feedInfo: Feed[], maxCount: number | undefin
       logInfo(`  Processing max ${maxCount} items of ${feed.items.length} total`);
       let skipCount = 0;
 
-
+      let feedEpisodeCount = 0;
       const promises = feed.items.slice(0, maxCount).map(async (item) => {
         const poddate = new Date(item.isoDate);
         logDebug(`  ${poddate} > ${feedRecord.earliest}?`);
@@ -51,6 +51,7 @@ export async function processFeeds( feedInfo: Feed[], maxCount: number | undefin
           const success = await db.saveEpisode(EpisodeInsert);
           if (success) {
             newEpisesodesCount++;
+            feedEpisodeCount++;
           } else {
             skipCount++;
           };
@@ -62,6 +63,7 @@ export async function processFeeds( feedInfo: Feed[], maxCount: number | undefin
       });
       await Promise.all(promises); // wait for all the feeds data to complete
       logInfo(`  ${maxCount - skipCount} items processed, ${skipCount} skipped`);
+      logInfo(`  ${feedEpisodeCount} new episodes found.`);
       // Update last check
       feedRecord.lastCheck = new Date();
       await db.updateFeedRecord(feedRecord);
