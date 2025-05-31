@@ -75,9 +75,32 @@ export async function processFeeds( feedInfo: Feed[], maxCount: number | undefin
   await Promise.all(feedPromises); // wait for all the feeds data to complete
   logInfo(`\n${newEpisesodesCount} new episodes added to the database`);
   logInfo(`\nDone!`);
+  await sendHeartBeat(newEpisesodesCount);
   process.exit(0);
 }
 
+
+async function sendHeartBeat(newEpisesodesCount: number) {
+  const heartbeatUrl = process.env.HEARTBEAT_URL;
+  if (heartbeatUrl) {
+    try {
+      const response = await fetch(heartbeatUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'completed', count: newEpisesodesCount }),
+      });
+      if (!response.ok) {
+        logError(`Heartbeat failed with status: ${response.status}`);
+      } else {
+        logInfo(`Heartbeat sent successfully: ${heartbeatUrl}`);
+      }
+    } catch (error) {
+      logError(`Error sending heartbeat: ${error}`);
+    }
+  }
+}
 
 /**
  * Build the episode to insert based on the feed record and the item
